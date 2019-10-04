@@ -49,7 +49,7 @@ search-term
 			try:
 				author_name, query_string = query_string[len('from:'):].split(' ', 1)
 			except ValueError:
-				author_name = query_string[len('in:'):]
+				author_name = query_string[len('from:'):]
 				query_string = ''
 			else:
 				query_string = query_string.lstrip()
