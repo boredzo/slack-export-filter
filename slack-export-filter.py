@@ -89,7 +89,11 @@ def channel_name_from_relative_path(rel_path):
 
 def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, _daily_log_name_exp=re.compile(r'[0-9]{4,}-[0-9]{2}-[0-9]{2}\.json')):
 	"Each item in slack_export_paths should be a path to a Slack export directory, containing users.json and zero or more channel directories, each channel directory containing zero or more yyyy-mm-dd.json files."
-	
+
+	# This is a band-aid; the outer loop is iterating over the list of paths and passing each path into where we expect a list of paths and iterate over it. Oops.
+	if isinstance(slack_export_paths, basestring):
+		slack_export_paths = [ slack_export_paths ]
+
 	for top_dir in slack_export_paths:
 		# Read channels.json
 		with open(os.path.join(top_dir, 'channels.json'), 'r') as chf:
