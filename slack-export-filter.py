@@ -99,7 +99,7 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 		only_these_channels = query['channels']
 
 		for ch in channels:
-			if only_these_channels and ch in only_these_channels:
+			if (not only_these_channels) or ch in only_these_channels:
 				for dir_path, subdir_names, file_names in os.walk(os.path.join(top_dir, ch)):
 					for fn in file_names:
 						if _daily_log_name_exp.match(fn):
