@@ -150,5 +150,5 @@ for top_dir_path in args or ['.']:
 
 					if matched_content:
 						when = datetime.datetime.fromtimestamp(float(message['ts']))
-						print ('[%s] <%s> %s' % (when, this_message_sender_username, filtered_text)).encode('utf-8')
-						print
+						print ('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text)).encode('utf-8')
+						print '-' * 80
