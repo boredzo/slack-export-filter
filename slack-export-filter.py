@@ -23,6 +23,7 @@ def parse_query(query_string, query=None):
 	'''Slack search query format:
 in:#?channel_name
 from:@?username
+is:thread
 "phrase"
 search-term
 '''
@@ -31,6 +32,7 @@ search-term
 			'channels': set([]),
 			'authors': set([]),
 			'search_terms': set([]),
+			'is': set([]),
 		}
 	query_string = query_string.strip()
 	while query_string:
@@ -56,6 +58,17 @@ search-term
 
 			author_name = author_name.lstrip('@')
 			query['authors'].add(author_name)
+
+		elif query_string.startswith('is:'):
+			try:
+				thing_that_it_is, query_string = query_string[len('is:'):].split(' ', 1)
+			except ValueError:
+				thing_that_it_is = query_string[len('is:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+
+			query['is'].add(thing_that_it_is)
 
 		elif query_string.startswith('"'):
 			try:
@@ -134,11 +147,15 @@ for top_dir_path in args or ['.']:
 				matched_channel = True
 				# No need to filter by channel because generate_channel_log_paths doesn't visit channels not matching the query.
 
+				matched_thread = True
+				if 'thread' in query['is']:
+					matched_thread = bool(message.get('thread_ts', False))
+
 				matched_author = True
 				if query['authors']:
 					matched_author = (this_message_sender in query['authors'] or this_message_sender_username in query['authors'])
 
-				if matched_channel and matched_author:
+				if matched_channel and matched_thread and matched_author:
 					filtered_text = dereference_usernames(users, message['text'])
 
 					matched_content = True
