@@ -30,13 +30,23 @@ search-term
 '''
 	if query is None:
 		query = {
-			'channels': set([]),
-			'authors': set([]),
-			'search_terms': set([]),
+			'channels_yes': set([]),
+			'authors_yes': set([]),
+			'search_terms_yes': set([]),
 			'is': set([]),
+
+			'channels_no': set([]),
+			'authors_no': set([]),
+			'search_terms_no': set([]),
+			'is_not': set([]),
 		}
 	query_string = query_string.strip()
 	while query_string:
+		negative = query_string.startswith('-')
+		if negative:
+			query_string = query_string[len('-'):]
+			if not query_string: continue
+
 		if query_string.startswith('in:'):
 			try:
 				channel_name, query_string = query_string[len('in:'):].split(' ', 1)
@@ -46,7 +56,7 @@ search-term
 			else:
 				query_string = query_string.lstrip()
 			channel_name = channel_name.lstrip('#')
-			query['channels'].add(channel_name)
+			query['channels_no' if negative else 'channels_yes'].add(channel_name)
 
 		elif query_string.startswith('from:'):
 			try:
@@ -58,7 +68,7 @@ search-term
 				query_string = query_string.lstrip()
 
 			author_name = author_name.lstrip('@')
-			query['authors'].add(author_name)
+			query['authors_no' if negative else 'authors_yes'].add(author_name)
 
 		elif query_string.startswith('is:'):
 			try:
@@ -69,7 +79,7 @@ search-term
 			else:
 				query_string = query_string.lstrip()
 
-			query['is'].add(thing_that_it_is)
+			query['is not' if negative else 'is'].add(thing_that_it_is)
 
 		elif query_string.startswith('"'):
 			try:
@@ -80,7 +90,7 @@ search-term
 			else:
 				query_string = query_string.lstrip()
 
-			query['search_terms'].add(phrase)
+			query['search_terms_no' if negative else 'search_terms_yes'].add(phrase)
 
 		else:
 			try:
@@ -91,7 +101,7 @@ search-term
 			else:
 				query_string = query_string.lstrip()
 
-			query['search_terms'].add(phrase)
+			query['search_terms_no' if negative else 'search_terms_yes'].add(phrase)
 
 	return query
 
@@ -114,9 +124,12 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 			channels_info = decoder.decode(chf.read())
 			channels = [ ch['name'] for ch in channels_info ]
 
-		only_these_channels = query['channels']
+		only_these_channels = query['channels_yes']
+		not_these_channels = query['channels_no']
 
 		for ch in channels:
+			if not_these_channels and ch in not_these_channels:
+				continue
 			if (not only_these_channels) or ch in only_these_channels:
 				for dir_path, subdir_names, file_names in os.walk(os.path.join(top_dir, ch)):
 					for fn in file_names:
@@ -149,22 +162,31 @@ for top_dir_path in args or ['.']:
 				# No need to filter by channel because generate_channel_log_paths doesn't visit channels not matching the query.
 
 				matched_thread = True
+				# Slack doesn't support -is:thread at all, so it's no great loss to treat these as mutually exclusive and not handle a nonsense query like “is:thread -is:thread”.
 				if 'thread' in query['is']:
 					matched_thread = bool(message.get('thread_ts', False))
+				elif 'thread' in query['is_not']:
+					matched_thread = not message.get('thread_ts', False)
 
 				matched_author = True
-				if query['authors']:
-					matched_author = (this_message_sender in query['authors'] or this_message_sender_username in query['authors'])
+				if query['authors_yes']:
+					matched_author = (this_message_sender in query['authors_yes'] or this_message_sender_username in query['authors_yes'])
+				if query['authors_no']:
+					matched_author = matched_author and (this_message_sender not in query['authors_no'] and this_message_sender_username not in query['authors_no'])
 
 				if matched_channel and matched_thread and matched_author:
 					filtered_text = dereference_usernames(users, message['text'])
 
 					matched_content = True
-					if query['search_terms']:
+					for term in query['search_terms_no']:
+						if term in filtered_text:
+							matched_content = False
+							break
+					if matched_content and query['search_terms_yes']:
 						matched_content = False
-						num_terms = len(query['search_terms'])
+						num_terms = len(query['search_terms_yes'])
 						num_matched = 0
-						for term in query['search_terms']:
+						for term in query['search_terms_yes']:
 							# TODO: This doesn't restrict to word boundaries. Need to fix that with some sort of tokenization/DFA implementation.
 							if term in filtered_text:
 								num_matched += 1
