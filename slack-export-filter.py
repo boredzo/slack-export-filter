@@ -8,10 +8,13 @@ import datetime
 import argparse
 import pprint
 import json
+import pathlib
 
-parser = argparse.ArgumentParser(epilog='Search the chat logs in a Slack history export for messages matching the given query (in the same syntax the official Slack client uses).', usage='slack-export-filter <query> <export-directory>')
-parser.add_argument('--users-file')
-opts, args = parser.parse_known_args()
+parser = argparse.ArgumentParser(epilog='Search the chat logs in a Slack history export for messages matching the given query (in the same syntax the official Slack client uses).')
+parser.add_argument('--users-file', type=pathlib.Path)
+parser.add_argument('query_string', help='The query to search for, in the same syntax Slack uses')
+parser.add_argument('export_dir_path', type=pathlib.Path, metavar='path_to_export_dir', help='The path to the unzipped export archive')
+opts = parser.parse_args()
 
 decoder = json.JSONDecoder()
 
@@ -115,7 +118,7 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 	"Each item in slack_export_paths should be a path to a Slack export directory, containing users.json and zero or more channel directories, each channel directory containing zero or more yyyy-mm-dd.json files."
 
 	# This is a band-aid; the outer loop is iterating over the list of paths and passing each path into where we expect a list of paths and iterate over it. Oops.
-	if isinstance(slack_export_paths, str):
+	if isinstance(slack_export_paths, str) or isinstance(slack_export_paths, pathlib.Path):
 		slack_export_paths = [ slack_export_paths ]
 
 	for top_dir in slack_export_paths:
@@ -136,9 +139,9 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 						if _daily_log_name_exp.match(fn):
 							yield os.path.join(dir_path, fn)
 
-query = parse_query(args.pop(0))
+query = parse_query(opts.query_string)
 
-for top_dir_path in args or ['.']:
+for top_dir_path in [opts.export_dir_path] or ['.']:
 	users = { 'USLACKBOT': 'slackbot' } #user ID to username
 	users_file_path = opts.users_file or (os.path.join(top_dir_path, 'users.json') if os.path.exists(os.path.join(top_dir_path, 'users.json')) else None)
 	if users_file_path:
@@ -194,5 +197,5 @@ for top_dir_path in args or ['.']:
 
 					if matched_content:
 						when = datetime.datetime.fromtimestamp(float(message['ts']))
-						print(('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text)).encode('utf-8'))
+						print('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text))
 						print('-' * 80)
