@@ -141,7 +141,8 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 
 query = parse_query(opts.query_string)
 
-for top_dir_path in [opts.export_dir_path] or ['.']:
+def search_export(query, top_dir_path):
+	"Yields (channel_name, timestamp_string, sender_username, filtered_text, message) for each message matched by the query. The last item, message, is a dictionary containing all of the message properties."
 	users = { 'USLACKBOT': 'slackbot' } #user ID to username
 	users_file_path = opts.users_file or (os.path.join(top_dir_path, 'users.json') if os.path.exists(os.path.join(top_dir_path, 'users.json')) else None)
 	if users_file_path:
@@ -197,5 +198,11 @@ for top_dir_path in [opts.export_dir_path] or ['.']:
 
 					if matched_content:
 						when = datetime.datetime.fromtimestamp(float(message['ts']))
-						print('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text))
-						print('-' * 80)
+						yield (channel_name, when, this_message_sender_username, filtered_text, message)
+
+matches = list(search_export(query, opts.export_dir_path or '.'))
+matches.sort() # Sorts by channel and then chronologically
+
+for (channel_name, when, this_message_sender_username, filtered_text, message) in matches:
+	print('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text))
+	print('-' * 80)
