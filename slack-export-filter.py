@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import sys
@@ -115,7 +115,7 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 	"Each item in slack_export_paths should be a path to a Slack export directory, containing users.json and zero or more channel directories, each channel directory containing zero or more yyyy-mm-dd.json files."
 
 	# This is a band-aid; the outer loop is iterating over the list of paths and passing each path into where we expect a list of paths and iterate over it. Oops.
-	if isinstance(slack_export_paths, basestring):
+	if isinstance(slack_export_paths, str):
 		slack_export_paths = [ slack_export_paths ]
 
 	for top_dir in slack_export_paths:
@@ -154,7 +154,7 @@ for top_dir_path in args or ['.']:
 				try:
 					this_message_sender = message['user']
 				except KeyError:
-					print message
+					print(message)
 					raise
 				this_message_sender_username = users[this_message_sender]
 
@@ -194,5 +194,5 @@ for top_dir_path in args or ['.']:
 
 					if matched_content:
 						when = datetime.datetime.fromtimestamp(float(message['ts']))
-						print ('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text)).encode('utf-8')
-						print '-' * 80
+						print(('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text)).encode('utf-8'))
+						print('-' * 80)
