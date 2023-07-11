@@ -158,9 +158,15 @@ def search_export(query, top_dir_path):
 				try:
 					this_message_sender = message['user']
 				except KeyError:
-					print(message)
-					raise
-				this_message_sender_username = users[this_message_sender]
+					try:
+						this_message_sender = message['bot_id']
+					except KeyError:
+						print message
+						raise
+					else:
+						this_message_sender_username = message['username']
+				else:
+					this_message_sender_username = users[this_message_sender]
 
 				matched_channel = True
 				# No need to filter by channel because generate_channel_log_paths doesn't visit channels not matching the query.
