@@ -28,6 +28,10 @@ def parse_query(query_string, query=None):
 in:#?channel_name
 from:@?username
 is:thread
+on:date
+during:month
+before:date
+after:date
 "phrase"
 search-term
 '''
@@ -42,6 +46,11 @@ search-term
 			'authors_no': set([]),
 			'search_terms_no': set([]),
 			'is_not': set([]),
+
+			'on_date': None,
+			'during_month': None,
+			'before_date': None,
+			'after_date': None,
 		}
 	query_string = query_string.strip()
 	while query_string:
@@ -83,6 +92,86 @@ search-term
 				query_string = query_string.lstrip()
 
 			query['is not' if negative else 'is'].add(thing_that_it_is)
+
+		elif query_string.startswith('during:'):
+			try:
+				month_name, query_string = query_string[len('during:'):].split(' ', 1)
+			except ValueError:
+				month_name = query_string[len('during:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			query_month_name = month_name.lower()
+
+			month_names = [
+				'january', 'february', 'march',
+				'april',   'may',      'june',
+				'july',    'august',   'september',
+				'october', 'november', 'december',
+			]
+			try:
+				query['during_month'] = month_names.index(query_month_name) + 1
+			except ValueError:
+				for i, known_name in enumerate(month_names):
+					if known_name[:3] == query_month_name[:3]:
+						query['during_month'] = i + 1
+
+		elif query_string.startswith('on:'):
+			try:
+				date_string, query_string = query_string[len('on:'):].split(' ', 1)
+			except ValueError:
+				date_string = query_string[len('on:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			date = datetime.date.fromisoformat(date_string)
+			query['on_date'] = date
+
+		elif query_string.startswith('before:'):
+			try:
+				date_string, query_string = query_string[len('before:'):].split(' ', 1)
+			except ValueError:
+				date_string = query_string[len('before:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			date = datetime.date.fromisoformat(date_string)
+			query['before_date'] = date
+
+		#Convenience synonym for Twitter's term for the same thing.
+		elif query_string.startswith('until:'):
+			try:
+				date_string, query_string = query_string[len('until:'):].split(' ', 1)
+			except ValueError:
+				date_string = query_string[len('until:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			date = datetime.date.fromisoformat(date_string)
+			query['before_date'] = date
+
+		elif query_string.startswith('after:'):
+			try:
+				date_string, query_string = query_string[len('after:'):].split(' ', 1)
+			except ValueError:
+				date_string = query_string[len('after:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			date = datetime.date.fromisoformat(date_string)
+			query['after_date'] = date
+
+		#Convenience synonym for Twitter's term for the same thing.
+		elif query_string.startswith('since:'):
+			try:
+				date_string, query_string = query_string[len('since:'):].split(' ', 1)
+			except ValueError:
+				date_string = query_string[len('since:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			date = datetime.date.fromisoformat(date_string)
+			query['after_date'] = date
 
 		elif query_string.startswith('"'):
 			try:
@@ -165,13 +254,13 @@ def search_export(query, top_dir_path):
 						raise
 					else:
 						try:
-						this_message_sender_username = message['username']
+							this_message_sender_username = message['username']
 						except KeyError:
 							# So we have a bot_id but no username. That's just going to have to do. Mark it with a prefix to distinguish it from a regular username.
 							this_message_sender_username = '$bot_' + this_message_sender
 				else:
 					try:
-					this_message_sender_username = users[this_message_sender]
+						this_message_sender_username = users[this_message_sender]
 					except KeyError:
 						# So we have a user ID but no username. That's just going to have to do. Mark it with a prefix to distinguish it from a regular username.
 						this_message_sender_username = '$unknown_' + this_message_sender
@@ -186,13 +275,31 @@ def search_export(query, top_dir_path):
 				elif 'thread' in query['is_not']:
 					matched_thread = not message.get('thread_ts', False)
 
+				exact_date_criterion = query.get('on_date', None)
+				during_month_criterion = query.get('during_month', None)
+				before_date_criterion = query.get('before_date', None)
+				after_date_criterion = query.get('after_date', None)
+				if (exact_date_criterion is not None
+				or during_month_criterion is not None
+				or before_date_criterion is not None
+				or after_date_criterion is not None):
+					message_date = datetime.date.fromtimestamp(float(message['ts']))
+
+					matched_exact_date = message_date == exact_date_criterion if exact_date_criterion is not None else True
+					matched_during_month = message_date.month == during_month_criterion if during_month_criterion is not None else True
+					matched_before_date = message_date <= before_date_criterion if before_date_criterion is not None else True
+					matched_after_date = message_date >= after_date_criterion if after_date_criterion is not None else True
+				else:
+					matched_exact_date = matched_during_month = matched_before_date = matched_after_date = True
+				matched_on_dates = (matched_exact_date and matched_during_month and matched_before_date and matched_after_date)
+
 				matched_author = True
 				if query['authors_yes']:
 					matched_author = (this_message_sender in query['authors_yes'] or this_message_sender_username in query['authors_yes'])
 				if query['authors_no']:
 					matched_author = matched_author and (this_message_sender not in query['authors_no'] and this_message_sender_username not in query['authors_no'])
 
-				if matched_channel and matched_thread and matched_author:
+				if matched_channel and matched_thread and matched_author and matched_on_dates:
 					filtered_text = dereference_usernames(users, message['text'])
 
 					matched_content = True
