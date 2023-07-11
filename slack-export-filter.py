@@ -344,6 +344,10 @@ def search_export(query, top_dir_path):
 matches = list(search_export(query, opts.export_dir_path or '.'))
 matches.sort() # Sorts by channel and then chronologically
 
+matched_any = False
 for (channel_name, when, this_message_sender_username, filtered_text, message) in matches:
 	print('#%s [%s] <%s> %s' % (channel_name, when, this_message_sender_username, filtered_text))
 	print('-' * 80)
+	matched_any = True
+
+sys.exit(0 if matched_any else 1)
