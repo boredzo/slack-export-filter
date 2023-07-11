@@ -161,12 +161,20 @@ def search_export(query, top_dir_path):
 					try:
 						this_message_sender = message['bot_id']
 					except KeyError:
-						print message
+						print("Couldn't get bot_id from message:", message, file=sys.stderr)
 						raise
 					else:
+						try:
 						this_message_sender_username = message['username']
+						except KeyError:
+							# So we have a bot_id but no username. That's just going to have to do. Mark it with a prefix to distinguish it from a regular username.
+							this_message_sender_username = '$bot_' + this_message_sender
 				else:
+					try:
 					this_message_sender_username = users[this_message_sender]
+					except KeyError:
+						# So we have a user ID but no username. That's just going to have to do. Mark it with a prefix to distinguish it from a regular username.
+						this_message_sender_username = '$unknown_' + this_message_sender
 
 				matched_channel = True
 				# No need to filter by channel because generate_channel_log_paths doesn't visit channels not matching the query.
