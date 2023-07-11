@@ -203,7 +203,7 @@ def channel_name_from_relative_path(rel_path):
 	immediate_parent_dir_name = os.path.basename(dir_path) # For paths like logs/channel/2019-04-01.json
 	return immediate_parent_dir_name or '<unknown_channel>'
 
-def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, _daily_log_name_exp=re.compile(r'[0-9]{4,}-[0-9]{2}-[0-9]{2}\.json')):
+def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, _daily_log_name_exp=re.compile(r'(?P<date>[0-9]{4,}-[0-9]{2}-[0-9]{2})\.json')):
 	"Each item in slack_export_paths should be a path to a Slack export directory, containing users.json and zero or more channel directories, each channel directory containing zero or more yyyy-mm-dd.json files."
 
 	# This is a band-aid; the outer loop is iterating over the list of paths and passing each path into where we expect a list of paths and iterate over it. Oops.
@@ -218,6 +218,10 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 
 		only_these_channels = query['channels_yes']
 		not_these_channels = query['channels_no']
+		exact_date_criterion = query.get('on_date', None)
+		during_month_criterion = query.get('during_month', None)
+		before_date_criterion = query.get('before_date', None)
+		after_date_criterion = query.get('after_date', None)
 
 		for ch in channels:
 			if not_these_channels and ch in not_these_channels:
@@ -225,8 +229,24 @@ def generate_channel_log_paths(slack_export_paths, query={ 'channels': set() }, 
 			if (not only_these_channels) or ch in only_these_channels:
 				for dir_path, subdir_names, file_names in os.walk(os.path.join(top_dir, ch)):
 					for fn in file_names:
-						if _daily_log_name_exp.match(fn):
-							yield os.path.join(dir_path, fn)
+						match = _daily_log_name_exp.match(fn)
+						if match:
+							if (exact_date_criterion is not None
+							or during_month_criterion is not None
+							or before_date_criterion is not None
+							or after_date_criterion is not None):
+								log_date = datetime.date.fromisoformat(match.group('date'))
+
+								matched_exact_date = log_date == exact_date_criterion if exact_date_criterion is not None else True
+								matched_during_month = log_date.month == during_month_criterion if during_month_criterion is not None else True
+								matched_before_date = log_date <= before_date_criterion if before_date_criterion is not None else True
+								matched_after_date = log_date >= after_date_criterion if after_date_criterion is not None else True
+							else:
+								matched_exact_date = matched_during_month = matched_before_date = matched_after_date = True
+							matched_on_dates = (matched_exact_date and matched_during_month and matched_before_date and matched_after_date)
+
+							if matched_on_dates:
+								yield os.path.join(dir_path, fn)
 
 query = parse_query(opts.query_string)
 
