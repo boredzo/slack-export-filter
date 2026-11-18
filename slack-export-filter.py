@@ -91,7 +91,7 @@ search-term
 			else:
 				query_string = query_string.lstrip()
 
-			query['is not' if negative else 'is'].add(thing_that_it_is)
+			query['is_not' if negative else 'is'].add(thing_that_it_is)
 
 		elif query_string.startswith('during:'):
 			try:
