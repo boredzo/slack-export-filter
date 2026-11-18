@@ -291,9 +291,9 @@ def search_export(query, top_dir_path):
 				matched_thread = True
 				# Slack doesn't support -is:thread at all, so it's no great loss to treat these as mutually exclusive and not handle a nonsense query like “is:thread -is:thread”.
 				if 'thread' in query['is']:
-					matched_thread = bool(message.get('thread_ts', False))
+					matched_thread = message.get('thread_ts', None) != message['ts']
 				elif 'thread' in query['is_not']:
-					matched_thread = not message.get('thread_ts', False)
+					matched_thread = message.get('thread_ts', None) == message['ts']
 
 				exact_date_criterion = query.get('on_date', None)
 				during_month_criterion = query.get('during_month', None)
