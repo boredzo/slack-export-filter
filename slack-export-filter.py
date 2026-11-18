@@ -23,6 +23,18 @@ def dereference_usernames(users, text):
 		text = text.replace(k, users[k])
 	return text
 
+def message_has_reaction(message: dict, reaction_name_base: str) -> bool:
+	for reaction_record in message.get('reactions', []):
+		recorded_reaction_name = reaction_record['name']
+		try:
+			recorded_reaction_name_base = recorded_reaction_name.split('::', 1)
+		except ValueError:
+			recorded_reaction_name_base = recorded_reaction_name
+		if recorded_reaction_name == reaction_name_base:
+			return True
+
+	return False
+
 def parse_query(query_string, query=None):
 	'''Slack search query format:
 in:#?channel_name
@@ -173,6 +185,23 @@ search-term
 			date = datetime.date.fromisoformat(date_string)
 			query['after_date'] = date
 
+		elif query_string.startswith('has:'):
+			try:
+				reaction_name_string, query_string = query_string[len('has:'):].split(' ', 1)
+			except ValueError:
+				reaction_name_string = query_string[len('has:'):]
+				query_string = ''
+			else:
+				query_string = query_string.lstrip()
+			try:
+				reaction_name_base, reaction_name_modifiers = reaction_name_string.split('::', 1)
+			except ValueError:
+				reaction_name_base = reaction_name_string
+				reaction_name_modifiers = ''
+
+			reactions = query.setdefault('reactions', [])
+			reactions.append(reaction_name_base)
+
 		elif query_string.startswith('"'):
 			try:
 				phrase, query_string = query_string[len('"'):].split('"', 1)
@@ -294,6 +323,12 @@ def search_export(query, top_dir_path):
 					matched_thread = message.get('thread_ts', None) != message['ts']
 				elif 'thread' in query['is_not']:
 					matched_thread = message.get('thread_ts', None) == message['ts']
+
+				has_all_reactions = True
+				for reaction_name_base in query.get('reactions', []):
+					if not message_has_reaction(message, reaction_name_base):
+						has_all_reactions = False
+						break
 
 				exact_date_criterion = query.get('on_date', None)
 				during_month_criterion = query.get('during_month', None)
